@@ -4,7 +4,6 @@ import argparse
 import os
 import shutil
 import time
-import pdb
 import random
 import torch
 import torch.nn as nn
@@ -15,7 +14,6 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from collections import OrderedDict
-from torch.autograd import grad
 from utils import *
 import torch.optim as optim
 import pickle
@@ -25,11 +23,10 @@ import scipy
 from sklearn.cluster import KMeans
 import numpy as np
 import matplotlib.pyplot as plt
-from score_functions import Score_Gaussian, Score_GMM
+from score_functions import Score_Gaussian
 import attack_model
 import lo_glrt
 import torchvision.models as tv_models
-import pdb
 from prn import *
 from get_detectors import get_detectors
 
@@ -395,7 +392,7 @@ def main():
             top1_accuracy.update(prec1.item(), inputs.size(0))
             top5_accuracy.update(prec5.item(), inputs.size(0))
             confidence_score.update(conf_score.item(), inputs.size(0))
-            if args.detector_arch.startswith('gaussian') or args.detector_arch.startswith('gmm'):
+            if args.detector_arch.startswith('gaussian'):
                 test_statistics = detector(adv_input).cpu()
             if args.detector_arch.startswith('prn'):
                 test_statistics = detector(adv_input_processed.cuda()).cpu()

@@ -1,8 +1,6 @@
 import torch.nn as nn
 import torch
 import numpy as np
-from virtual_bn import VirtualBatchNorm
-import pdb
 
 def target_indices(chosen_target_classes, num_classes, nz):
     return np.array([np.array(range(cls * nz, nz * (1 + cls))) for cls in chosen_target_classes])
@@ -35,5 +33,8 @@ class targeted_sampler(nn.Module):
             indices = np.random.choice(target_class_indices.ravel(), input_size)
         noise = np.sqrt(noise_size)*torch.eye(noise_size, dtype = torch.float)[indices]
         targets = torch.LongTensor(input_size)
-        targets.fill_(torch.tensor(chosen_target_class, dtype=torch.float)) 
+        if indices_type=='OneClass':
+            targets.fill_(torch.tensor(chosen_target_class, dtype=torch.float)) 
+        else:
+            targets.data = torch.tensor(chosen_target_classes, dtype=torch.int)
         return (noise, targets)

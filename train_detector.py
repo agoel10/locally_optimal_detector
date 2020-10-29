@@ -4,7 +4,6 @@ import argparse
 import os
 import shutil
 import time
-import pdb
 import random
 import torch
 import torch.nn as nn
@@ -26,7 +25,6 @@ from sklearn.cluster import KMeans
 import numpy as np
 import matplotlib.pyplot as plt
 import attack_model
-import pdb
 import torch_dct as dct
 from sklearn import linear_model
 from sklearn.utils import shuffle
@@ -214,11 +212,7 @@ def main():
     cudnn.benchmark = True
 
     print("==> creating attacker's model ")
-    if args.attacker_type == 'NAG':
-        attacker = attack_model.NAG_netAttacker(args.nz, ngpu, args.num_classes, args.image_size, args.dataset)
-    elif args.attacker_type == 'non-targeted-sampler':
-        attacker = attack_model.non_targeted_sampler(args.num_perts, args.image_size)
-    elif args.attacker_type == 'targeted-sampler':
+    if args.attacker_type == 'targeted-sampler':
         attacker = attack_model.targeted_sampler(args.num_perts, args.num_classes, args.image_size)
 
     attacker.load_state_dict(torch.load(args.location_attacker))
@@ -252,13 +246,8 @@ def main():
 
     for epoch in range(start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch)
-
         print('\nEpoch: [%d | %d] LR: %f' % (epoch + 1, args.epochs, state['lr']))
-
         train_loss, train_acc = train(train_loader, attacker, detector, criterion, optimizer, threshold, epoch)
-
-        append logger file
-
         is_best = train_acc > best_acc
         # pdb.set_trace()
         best_acc = max(train_acc, best_acc)
@@ -306,7 +295,6 @@ def train(trainloader, attacker, detector, criterion, optimizer, threshold, epoc
             if args.attacker_type == 'targeted-sampler':
                 chosen_target_classes = np.random.choice(args.num_classes, inputs.size(0))
 
-                # A randomly chosen class and
                 noise_size = args.num_classes * args.num_perts
                 noise, _ = attacker.get_noise(inputs.size(0), indices_type="MultiClass")
                 if args.cuda:
@@ -316,25 +304,17 @@ def train(trainloader, attacker, detector, criterion, optimizer, threshold, epoc
             perturb = torch.clamp(delta * multiplier, min_val, max_val)
         adv_input = torch.clamp(inputs + epsilon * perturb / 255, 0, 1)
 
-        # input_processed = preprocess_classifier(inputs, dataset=args.dataset, type='input')
-        # adv_input_processed = preprocess_classifier(adv_input, dataset=args.dataset, type='input')
+        input_processed = preprocess_classifier(inputs, dataset=args.dataset, type='input')
+        adv_input_processed = preprocess_classifier(adv_input, dataset=args.dataset, type='input')
 
         if np.random.rand(1) < 0.5:
             test_st = detector(adv_input)
-            if args.detector_arch.startswith('prn'):
-                pdb.set_trace()
-                pred = torch.sigmoid(test_st)
-            else:
-                pred = torch.sigmoid(test_st - threshold)
-
+            pred = torch.sigmoid(test_st - threshold)
             target = torch.ones(adv_input.size(0), dtype=torch.float, device='cuda')
 
         else:
             test_st = detector(inputs)
-            if args.detector_arch.startswith('prn'):
-                pred = torch.sigmoid(test_st)
-            else:
-                pred = torch.sigmoid(test_st - threshold)
+            pred = torch.sigmoid(test_st - threshold)
             target = torch.zeros(inputs.size(0), dtype=torch.float, device='cuda')
 
         labels = pred > 0.5
@@ -406,26 +386,14 @@ def test(testloader, attacker, detector, criterion, threshold, epoch):
         adv_input_processed = preprocess_classifier(adv_input, dataset=args.dataset, type='input')
 
         if np.random.rand(1) < 0.5:
-            if args.detector_arch.startswith('gaussian') or args.detector_arch.startswith('gmm'):
+            if args.detector_arch.startswith('gaussian'):
                 test_st = detector(adv_input)
-            if args.detector_arch.startswith('prn'):
-                test_st = detector(adv_input_processed.cuda())
-
-            if args.detector_arch.startswith('prn'):
-                pred = torch.sigmoid(test_st)
-            else:
                 pred = torch.sigmoid(test_st - threshold)
             target = torch.ones(adv_input.size(0), dtype=torch.float, device='cuda')
 
         else:
-            if args.detector_arch.startswith('gaussian') or args.detector_arch.startswith('gmm'):
+            if args.detector_arch.startswith('gaussian'):
                 test_st = detector(inputs)
-            if args.detector_arch.startswith('prn'):
-                test_st = detector(input_processed.cuda())
-
-            if args.detector_arch.startswith('prn'):
-                pred = torch.sigmoid(test_st)
-            else:
                 pred = torch.sigmoid(test_st - threshold)
 
             target = torch.zeros(inputs.size(0), dtype=torch.float, device='cuda')
